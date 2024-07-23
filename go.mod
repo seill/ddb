@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.30.3
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.14.9
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.34.3
-	github.com/seill/util v1.0.0
+	github.com/seill/util v1.0.2
 )
 
 require (
@@ -35,7 +35,9 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.0 // indirect
+	github.com/seill/log v1.0.0
+	golang.org/x/text v0.14.0 // indirect
 	gorm.io/datatypes v1.2.1 // indirect
-	gorm.io/driver/mysql v1.5.6 // indirect
-	gorm.io/gorm v1.25.9 // indirect
+	gorm.io/driver/mysql v1.5.7 // indirect
+	gorm.io/gorm v1.25.11 // indirect
 )

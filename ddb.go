@@ -2,6 +2,7 @@ package ddb
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -19,8 +20,9 @@ type IDynamoDbRecord interface {
 }
 
 type DynamoDbMetaData struct {
-	PK               string
-	SK               string
+	IDynamoDbRecord  `json:"-" dynamodbav:"-"`
+	PK               string     `json:",omitempty" dynamodbav:",omitempty"`
+	SK               string     `json:",omitempty" dynamodbav:",omitempty"`
 	GSI1PK           *string    `json:",omitempty" dynamodbav:",omitempty"`
 	GSI1SK           *string    `json:",omitempty" dynamodbav:",omitempty"`
 	GSI2PK           *string    `json:",omitempty" dynamodbav:",omitempty"`
@@ -33,6 +35,16 @@ type DynamoDbMetaData struct {
 	GSI5SK           *string    `json:",omitempty" dynamodbav:",omitempty"`
 	CreatedTimestamp *time.Time `json:",omitempty" dynamodbav:",omitempty"`
 	UpdatedTimestamp *time.Time `json:",omitempty" dynamodbav:",omitempty"`
+}
+
+func Marshal(m IDynamoDbRecord) (data []byte, err error) {
+	data, err = json.Marshal(m)
+	return
+}
+
+func Unmarshal(data []byte, m IDynamoDbRecord) (err error) {
+	err = json.Unmarshal(data, &m)
+	return
 }
 
 type QueryOptionOrder struct {
