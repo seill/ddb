@@ -211,7 +211,7 @@ func (r *Ddb) DeleteItem(key Key) (err error) {
 	return
 }
 
-func (r *Ddb) Insert(item interface{}) (err error) {
+func (r *Ddb) CreateItem(item interface{}) (err error) {
 	avItem, err := attributevalue.MarshalMap(item)
 	if err != nil {
 		return
@@ -381,112 +381,7 @@ func buildFunctionForExpressionAttributeNamesAndValue(parentName *[]string, func
 	return
 }
 
-func (r *Ddb) GetItemList(key Key, arrayOfField string, queryOption QueryOption) (items []map[string]types.AttributeValue, lastEvaluatedKey interface{}, err error) {
-	var output *dynamodb.QueryOutput
-	var expressionAttributeValues map[string]types.AttributeValue
-	var keyConditionExpression string
-	var scanIndexForward = queryOption.ScanIndexForward
-
-	if nil == scanIndexForward {
-		scanIndexForward = aws.Bool(false)
-	}
-
-	expressionAttributeValues = make(map[string]types.AttributeValue)
-
-	expressionAttributeValues[":gsipk"] = &types.AttributeValueMemberS{Value: *key.PK}
-
-	keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk", *key.IndexName)
-
-	if nil != key.SK {
-		expressionAttributeValues[":gsisk"] = &types.AttributeValueMemberS{Value: *key.SK}
-		if strings.HasSuffix(*key.SK, "#") {
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and begins_with(#%sSK, :gsisk)", *key.IndexName, *key.IndexName)
-		} else {
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK = :gsisk", *key.IndexName, *key.IndexName)
-		}
-	}
-
-	if nil != key.Condition {
-		expressionAttributeValues[":gsisk"] = &types.AttributeValueMemberS{Value: *key.SK}
-		switch *key.Condition {
-		case "equal":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK = :gsisk", *key.IndexName, *key.IndexName)
-		case "more_than":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK > :gsisk", *key.IndexName, *key.IndexName)
-		case "less_than":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK < :gsisk", *key.IndexName, *key.IndexName)
-		case "more_than_equal":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK >= :gsisk", *key.IndexName, *key.IndexName)
-		case "less_than_equal":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK <= :gsisk", *key.IndexName, *key.IndexName)
-		case "begins":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and begins_with(#%sSK, :gsisk)", *key.IndexName, *key.IndexName)
-		}
-	}
-
-	expressionAttributeNames := make(map[string]string)
-	expressionAttributeNames[fmt.Sprintf("#%sPK", *key.IndexName)] = fmt.Sprintf("%sPK", *key.IndexName)
-	expressionAttributeNames[fmt.Sprintf("#%sSK", *key.IndexName)] = fmt.Sprintf("%sSK", *key.IndexName)
-
-	input := &dynamodb.QueryInput{
-		ExpressionAttributeNames:  expressionAttributeNames,
-		ExpressionAttributeValues: expressionAttributeValues,
-		KeyConditionExpression:    aws.String(keyConditionExpression),
-		TableName:                 aws.String(r.tableName),
-		ScanIndexForward:          scanIndexForward,
-	}
-
-	if queryOption.Filter != nil {
-		filterExpression, _ := processQueryOptionFilter(queryOption.Filter, expressionAttributeValues, expressionAttributeNames)
-		input.FilterExpression = aws.String(filterExpression)
-	}
-
-	if queryOption.Page != nil && queryOption.Page.LastEvaluatedKey != nil {
-		LastEvaluatedKey, err := attributevalue.MarshalMap(queryOption.Page.LastEvaluatedKey)
-		if err != nil {
-			return nil, nil, err
-		}
-		input.ExclusiveStartKey = LastEvaluatedKey
-	}
-
-	if queryOption.Page != nil && 0 < queryOption.Page.PageSize {
-		input.Limit = aws.Int32(int32(queryOption.Page.PageSize))
-	}
-
-	if key.IndexName != nil {
-		input.IndexName = key.IndexName
-	}
-
-	if arrayOfField != "" {
-		temp := strings.Split(arrayOfField, ",")
-		tempArrayOfField := make([]string, len(temp))
-		for i, v := range temp {
-			expressionAttributeNames[fmt.Sprintf("#%s", v)] = strings.ReplaceAll(v, "#", "")
-			tempArrayOfField[i] = fmt.Sprintf("#%s", v)
-		}
-		input.ProjectionExpression = aws.String(strings.Join(tempArrayOfField, ","))
-	}
-
-	output, err = r.dynamoDb.Query(context.TODO(), input)
-	if err != nil {
-		return
-	}
-	if len(output.Items) < 1 && nil == output.LastEvaluatedKey {
-		err = fmt.Errorf("item not found (%s)", util.StructToString(key))
-		return
-	}
-	LastEvaluatedKey := new(map[string]interface{})
-	if output.LastEvaluatedKey != nil {
-		if err = attributevalue.UnmarshalMap(output.LastEvaluatedKey, &LastEvaluatedKey); err != nil {
-			return
-		}
-		lastEvaluatedKey = LastEvaluatedKey
-	}
-	items = output.Items
-	return
-}
-
-func (r *Ddb) GetItemListV2(key Key, arrayOfField string, queryOption QueryOption) (items []map[string]types.AttributeValue, lastEvaluatedKey interface{}, err error) {
+func (r *Ddb) GetListItem(key Key, arrayOfField string, queryOption QueryOption) (items []map[string]types.AttributeValue, lastEvaluatedKey interface{}, err error) {
 	var output *dynamodb.QueryOutput
 	var expressionAttributeValues map[string]types.AttributeValue
 	var keyConditionExpression string
@@ -502,33 +397,49 @@ func (r *Ddb) GetItemListV2(key Key, arrayOfField string, queryOption QueryOptio
 
 	keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk", *key.IndexName)
 
-	if nil != key.SK && strings.Contains(*key.SK, "/") {
-		skRange := strings.Split(*key.SK, "/")
-		expressionAttributeValues[":start_date"] = &types.AttributeValueMemberS{Value: skRange[0]}
-		expressionAttributeValues[":end_date"] = &types.AttributeValueMemberS{Value: skRange[1]}
+	if nil != key.SK {
+		if strings.Contains(*key.SK, "/") {
+			skRange := strings.Split(*key.SK, "/")
+			expressionAttributeValues[":from"] = &types.AttributeValueMemberS{Value: skRange[0]}
+			expressionAttributeValues[":to"] = &types.AttributeValueMemberS{Value: skRange[1]}
 
-		keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK BETWEEN :start_date AND :end_date", *key.IndexName, *key.IndexName)
+			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK BETWEEN :from AND :to", *key.IndexName, *key.IndexName)
+		} else {
+			expressionAttributeValues[":gsisk"] = &types.AttributeValueMemberS{Value: *key.SK}
+			if strings.HasSuffix(*key.SK, "#") {
+				keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and begins_with(#%sSK, :gsisk)", *key.IndexName, *key.IndexName)
+			} else {
+				keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK = :gsisk", *key.IndexName, *key.IndexName)
+			}
+		}
 	}
 
-	if nil != key.Condition && strings.Contains(*key.SK, "/") {
-		skRange := strings.Split(*key.SK, "/")
-		expressionAttributeValues[":start_date"] = &types.AttributeValueMemberS{Value: skRange[0]}
-		expressionAttributeValues[":end_date"] = &types.AttributeValueMemberS{Value: skRange[1]}
-		switch *key.Condition {
-		case "equal":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK = :gsisk", *key.IndexName, *key.IndexName)
-		case "more_than":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK > :gsisk", *key.IndexName, *key.IndexName)
-		case "less_than":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK < :gsisk", *key.IndexName, *key.IndexName)
-		case "more_than_equal":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK >= :gsisk", *key.IndexName, *key.IndexName)
-		case "less_than_equal":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK <= :gsisk", *key.IndexName, *key.IndexName)
-		case "begins":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and begins_with(#%sSK, :gsisk)", *key.IndexName, *key.IndexName)
-		case "between":
-			keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK BETWEEN :start_date AND :end_date", *key.IndexName, *key.IndexName)
+	if nil != key.Condition {
+		if strings.Contains(*key.SK, "/") {
+			skRange := strings.Split(*key.SK, "/")
+			expressionAttributeValues[":from"] = &types.AttributeValueMemberS{Value: skRange[0]}
+			expressionAttributeValues[":to"] = &types.AttributeValueMemberS{Value: skRange[1]}
+
+			switch *key.Condition {
+			case "between":
+				keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK BETWEEN :from AND :to", *key.IndexName, *key.IndexName)
+			}
+		} else {
+			expressionAttributeValues[":gsisk"] = &types.AttributeValueMemberS{Value: *key.SK}
+			switch *key.Condition {
+			case "equal":
+				keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK = :gsisk", *key.IndexName, *key.IndexName)
+			case "more_than":
+				keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK > :gsisk", *key.IndexName, *key.IndexName)
+			case "less_than":
+				keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK < :gsisk", *key.IndexName, *key.IndexName)
+			case "more_than_equal":
+				keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK >= :gsisk", *key.IndexName, *key.IndexName)
+			case "less_than_equal":
+				keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and #%sSK <= :gsisk", *key.IndexName, *key.IndexName)
+			case "begins":
+				keyConditionExpression = fmt.Sprintf("#%sPK = :gsipk and begins_with(#%sSK, :gsisk)", *key.IndexName, *key.IndexName)
+			}
 		}
 	}
 
