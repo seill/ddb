@@ -15,24 +15,33 @@ import (
 	"github.com/seill/util"
 )
 
+const (
+	GSI1 = "GSI1"
+	GSI2 = "GSI2"
+	GSI3 = "GSI3"
+	GSI4 = "GSI4"
+	GSI5 = "GSI5"
+)
+
 type IDynamoDbRecord interface {
 	BuildPk(id string) (pk string)
 }
 
 type DynamoDbMetaData struct {
 	IDynamoDbRecord  `json:"-" dynamodbav:"-"`
-	PK               string     `json:",omitempty" dynamodbav:",omitempty"`
-	SK               string     `json:",omitempty" dynamodbav:",omitempty"`
-	GSI1PK           *string    `json:",omitempty" dynamodbav:",omitempty"`
-	GSI1SK           *string    `json:",omitempty" dynamodbav:",omitempty"`
-	GSI2PK           *string    `json:",omitempty" dynamodbav:",omitempty"`
-	GSI2SK           *string    `json:",omitempty" dynamodbav:",omitempty"`
-	GSI3PK           *string    `json:",omitempty" dynamodbav:",omitempty"`
-	GSI3SK           *string    `json:",omitempty" dynamodbav:",omitempty"`
-	GSI4PK           *string    `json:",omitempty" dynamodbav:",omitempty"`
-	GSI4SK           *string    `json:",omitempty" dynamodbav:",omitempty"`
-	GSI5PK           *string    `json:",omitempty" dynamodbav:",omitempty"`
-	GSI5SK           *string    `json:",omitempty" dynamodbav:",omitempty"`
+	Id               string     `json:",omitempty" dynamodbav:",omitempty"`
+	PK               string     `json:"-" dynamodbav:",omitempty"`
+	SK               string     `json:"-" dynamodbav:",omitempty"`
+	GSI1PK           *string    `json:"-" dynamodbav:",omitempty"`
+	GSI1SK           *string    `json:"-" dynamodbav:",omitempty"`
+	GSI2PK           *string    `json:"-" dynamodbav:",omitempty"`
+	GSI2SK           *string    `json:"-" dynamodbav:",omitempty"`
+	GSI3PK           *string    `json:"-" dynamodbav:",omitempty"`
+	GSI3SK           *string    `json:"-" dynamodbav:",omitempty"`
+	GSI4PK           *string    `json:"-" dynamodbav:",omitempty"`
+	GSI4SK           *string    `json:"-" dynamodbav:",omitempty"`
+	GSI5PK           *string    `json:"-" dynamodbav:",omitempty"`
+	GSI5SK           *string    `json:"-" dynamodbav:",omitempty"`
 	CreatedTimestamp *time.Time `json:",omitempty" dynamodbav:",omitempty"`
 	UpdatedTimestamp *time.Time `json:",omitempty" dynamodbav:",omitempty"`
 }
